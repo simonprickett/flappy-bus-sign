@@ -3,9 +3,9 @@ from pyflipdot.sign import HanoverSign
 from serial import Serial
 from random import randint
 from time import sleep
-
-def flap(arguments):
-    print("FLAP!")
+import threading
+from sshkeyboard import listen_keyboard
+from collections import deque
 
 ser = Serial('/dev/ttyUSB0')
 controller = HanoverController(ser)
@@ -13,9 +13,11 @@ controller = HanoverController(ser)
 sign = HanoverSign(address=0, width=84, height=7)
 controller.add_sign('sign', sign)
 
+sleep(2)
 x = 32
 player_x = 24
 player_y = 3
+player_moves = deque()
 
 digits = {
     "0": [ 
@@ -109,6 +111,17 @@ digits = {
          ]
 }
 
+def key_pressed(key):
+        if (key == "space"):
+            player_moves.append(1)
+            player_moves.append(1)
+
+def start_keyboard_listener():
+    listen_keyboard(key_pressed)
+
+t = threading.Thread(target=start_keyboard_listener)
+t.start()
+
 image = sign.create_image()
 
 def draw_digit(to_draw, start_x):
@@ -159,6 +172,20 @@ while True:
         print("boom")
         break
 
+    try:
+        # If no exception here, player should rise towards the top here.
+        player_moves.pop()
+        player_y -= 1
+    except IndexError:
+        # Player should sink towards the bottom here.
+        player_y += 1
+
+    if (player_y < 0):
+        player_y = 0
+    elif (player_y == 7):
+        print("floor")
+        break
+
     image[player_y, player_x] = True
 
     # Update the score if the player just passed a pipe.
@@ -190,4 +217,5 @@ while True:
     controller.draw_image(image)
     sleep(.5)
 
+# TODO how to restart?
 print(f"game over, score: {score}")
